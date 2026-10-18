@@ -29,6 +29,13 @@ function Add-Row([string]$Attribute, [object]$Value) {
 $bios = Get-CimInstance Win32_BIOS
 $board = Get-CimInstance Win32_BaseBoard | Select-Object -First 1
 $system = Get-CimInstance Win32_ComputerSystem
+
+# This formats the Windows version like System Information—for example, 10.0.26300 Build 26300. It uses the operating system’s Caption, Version, and BuildNumber properties rather than hardcoding anything from your screenshot.
+$os = Get-CimInstance Win32_OperatingSystem
+Add-Row 'OS Name' $os.Caption.Trim()
+Add-Row 'Version' ('{0} Build {1}' -f $os.Version, $os.BuildNumber)
+Add-Row 'System Name' $system.Name
+
 $processors = @(Get-CimInstance Win32_Processor | ForEach-Object {
     '{0}, {1} MHz, {2} Core(s), {3} Logical Processor(s)' -f `
         $_.Name.Trim(), $_.MaxClockSpeed, $_.NumberOfCores, $_.NumberOfLogicalProcessors
@@ -94,6 +101,89 @@ $lines = @('| Attribute | Value |', '| --- | --- |')
 $lines += @($rows | ForEach-Object {
     '| {0} | {1} |' -f (Escape-Cell $_.Attribute), (Escape-Cell $_.Value)
 })
+
+# This lists shares exposed by this computer—not mapped drives or other computers visible in Explorer. It excludes Windows’ special administrative shares such as C$, ADMIN$, and IPC$, but retains ordinary folder shares, including user-created hidden shares.
+$lines += @('', '## Network shares', '')
+
+try {
+    $shares = @(
+        Get-SmbShare -ErrorAction Stop |
+            Where-Object { -not $_.Special -and $_.Path } |
+            Sort-Object Name
+    )
+
+    if ($shares.Count) {
+        $lines += @(
+            '| Share name | Local folder | Network path |'
+            '| --- | --- | --- |'
+        )
+
+        $lines += @($shares | ForEach-Object {
+            $unc = '\\{0}\{1}' -f $system.Name, $_.Name
+
+            '| {0} | {1} | {2} |' -f `
+                (Escape-Cell $_.Name),
+                (Escape-Cell $_.Path),
+                (Escape-Cell $unc)
+        })
+    }
+    else {
+        $lines += 'No non-special folder shares found.'
+    }
+}
+catch {
+    $lines += (
+        'Unable to read network shares: {0}' -f
+        (Escape-Cell $_.Exception.Message)
+    )
+}
+
+# This runs only tailscale serve status, which reads the Serve status without changing its configuration. Keeping the human-readable output also preserves the layout you showed; Tailscale notes that its text and JSON status outputs currently return different information.
+$lines += @('', '## Tailscale Serve status', '')
+
+$tailscale = Get-Command tailscale.exe -ErrorAction SilentlyContinue
+
+$tailscalePath = if ($tailscale) {
+    $tailscale.Source
+}
+else {
+    Join-Path $env:ProgramFiles 'Tailscale\tailscale.exe'
+}
+
+if (Test-Path -LiteralPath $tailscalePath) {
+    try {
+        # Read status only; do not change the Serve configuration.
+        $serveOutput = @(
+            & $tailscalePath serve status 2>&1 |
+                ForEach-Object { $_.ToString() }
+        )
+        $serveExitCode = $LASTEXITCODE
+
+        if ($serveExitCode -ne 0) {
+            $lines += "Command returned exit code $serveExitCode."
+            $lines += ''
+        }
+
+        if ($serveOutput.Count) {
+            $lines += @('```text')
+            $lines += $serveOutput
+            $lines += @('```')
+        }
+        else {
+            $lines += 'No status output returned.'
+        }
+    }
+    catch {
+        $lines += (
+            'Unable to read Tailscale Serve status: {0}' -f
+            (Escape-Cell $_.Exception.Message)
+        )
+    }
+}
+else {
+    $lines += 'Tailscale CLI not found in PATH or the default installation folder.'
+}
+
 $markdown = $lines -join [Environment]::NewLine
 $markdown | Set-Content -LiteralPath $OutputPath -Encoding UTF8
 if ($Clipboard) { Set-Clipboard -Value $markdown }
