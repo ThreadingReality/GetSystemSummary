@@ -361,3 +361,9 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Local generated reports from this script (may contain sensitive host/share/serial info)
+SystemSummary.md
+
+# Browser/download temp artifacts
+*.crdownload

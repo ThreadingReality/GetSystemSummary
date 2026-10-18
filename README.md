@@ -4,7 +4,9 @@ A small, local PowerShell script that collects a Windows PC's hardware and syste
 
 ## Project status
 
-The original hardware-report script has been run successfully by the owner. Windows identification, SMB shares, and Tailscale Serve status were subsequently supplied as additions; verify that they are present in the local script before assuming these features are available.
+The implementation is stable and currently includes Windows identification, local SMB share reporting, and Tailscale Serve status reporting in addition to the original hardware summary.
+
+`Get-SystemSummary.ps1` is the source of truth for behavior. Keep future changes small, local, and privacy-conscious.
 
 ## Requirements
 
@@ -37,6 +39,8 @@ Choose the output file:
 
 The default report is `SystemSummary.md` beside the script. An existing output file is overwritten. A custom output directory must already exist.
 
+`SystemSummary.md` is ignored by Git in this repository because generated reports can contain machine-identifying details.
+
 ## Report contents
 
 Original hardware summary:
@@ -48,7 +52,7 @@ Original hardware summary:
 - System-reported physical memory.
 - Fixed drive letters, backing disk models, serial numbers, disk capacity, volume capacity, and volume labels.
 
-Requested additions, subject to local integration:
+Implemented additions:
 
 - OS Name, Version, and System Name.
 - Local SMB folder shares: share name, local folder, and UNC path; no ACL reporting.
@@ -87,3 +91,9 @@ Do not add automatic execution-policy changes to the script.
 The report can contain computer names, disk serial numbers, share paths, tailnet hostnames, URLs, and local proxy destinations. Review it before sharing publicly.
 
 This is an inventory/reporting tool, not a configuration tool. It must not change shares, ACLs, firmware, network configuration, or Tailscale Serve settings.
+
+## Contributor and agent guidance
+
+`README.md` is human-oriented. For future agent work, use `AGENTS.md` as the primary machine-oriented context for implementation constraints, project layout, validation expectations, and safe-change rules.
+
+Supported agents for this workflow are GitHub Copilot, Hermes, and OpenCode.
